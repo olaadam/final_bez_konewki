@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from flask_sqlalchemy import SQLAlchemy
+import re;
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -20,6 +21,13 @@ class Flower(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     grid_position = db.Column(db.Integer, nullable=True)  # New field for grid position
 
+# Function to validate password complexity
+def validate_password(password):
+    # Password must be at least 8 characters long and contain at least one digit
+    if len(password) < 8 or not re.search(r'\d', password):
+        return False
+    return True
+
 # Create tables if they do not exist
 @app.before_request
 def create_tables():
@@ -38,15 +46,23 @@ def index():
 def register():
     username = request.form['username']
     password = request.form['password']
+    
+    # Check if username already exists
     if User.query.filter_by(username=username).first():
         session['error_message'] = "Username already exists!"
-    else:
-        new_user = User(username=username, password=password)
-        db.session.add(new_user)
-        db.session.commit()
-        session['username'] = username
-        return redirect(url_for('home'))
-    return redirect(url_for('index'))
+        return redirect(url_for('index'))
+    
+    # Validate password 
+    if not validate_password(password):
+        session['error_message'] = "Password must be at least 8 characters long and contain at least one digit."
+        return redirect(url_for('index'))
+
+    # Add user to database
+    new_user = User(username=username, password=password)
+    db.session.add(new_user)
+    db.session.commit()
+    session['username'] = username
+    return redirect(url_for('home'))
 
 # Login route
 @app.route('/login', methods=['POST'])
